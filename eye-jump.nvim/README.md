@@ -7,8 +7,8 @@ The bridge can calibrate the tracker using a fullscreen window. The
 nvim plugin calibrates the offset of the window within the display. So 
 currently it requires two calibrations, there's probably a reliable way for
 nvim to get the window coordinates (its own rectangle on screen) via an API, but 
-the `:winpos` command to work for me (running kitty -> tmux -> nvim probably breaks something).
-The double calibration is fairly reliable though.
+the `:winpos` command failed to work for me (running kitty -> tmux -> nvim probably breaks something).
+The double calibration seems fairly reliable though, and a calibration is "remembered"
 
 ## Quick start
 
