@@ -97,7 +97,7 @@ async function main(): Promise<void> {
     console.log('DEMO: synthetic gaze, not hardware data.');
   }
 
-  tracker.onSample(sample => stream.publish({ version: 1, point: !displayVerified || (controller && !controller.ready) ? null : normalizedPoint(sample), display, source: demo ? 'demo' : 'tobii', setup, setupAliases }));
+  tracker.onSample(sample => stream.publish({ version: 1, point: !displayVerified || (controller && !controller.ready) ? null : normalizedPoint(sample, false), display, source: demo ? 'demo' : 'tobii', setup, setupAliases }));
   await stream.listen(socketPath);
   console.log(`Gaze stream listening on ${socketPath}`);
   if (controller) {

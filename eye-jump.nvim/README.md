@@ -77,6 +77,10 @@ noninteractive startup only streams gaze. `pnpm setup:sdl` installs SDL's
 prebuilt native binding if it is missing; it downloads the binding from the
 upstream GitHub release. No Electron or browser is used.
 
+The bridge streams the tracker's unfiltered gaze for responsiveness. Invalid or
+off-display points are discarded rather than falling back to smoothed gaze.
+Editor alignment still averages recent samples while you look at each target.
+
 To check the fullscreen window without connecting or changing the tracker:
 
 ```sh
