@@ -1,0 +1,26 @@
+{
+  "name": "eye-jump-experiments",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "bridge": "tsx src/bridge.ts",
+    "setup:sdl": "node scripts/setup-sdl.mjs",
+    "displays": "tsx scripts/list-displays.ts",
+    "preview:calibration": "tsx scripts/preview-calibration.ts",
+    "typecheck": "tsc --noEmit",
+    "test:bridge": "tsx --test tests/*.test.ts",
+    "test:nvim": "nvim --headless -u NONE -l tests/nvim.lua",
+    "test": "pnpm typecheck && pnpm test:bridge && pnpm test:nvim"
+  },
+  "dependencies": {
+    "@kmamal/sdl": "0.11.13",
+    "usb": "2.19.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/w3c-web-usb": "1.0.14",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

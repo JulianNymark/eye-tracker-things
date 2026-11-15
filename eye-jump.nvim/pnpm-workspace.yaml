@@ -1,0 +1,4 @@
+allowBuilds:
+  '@kmamal/sdl': true
+  esbuild: true
+  usb: true
