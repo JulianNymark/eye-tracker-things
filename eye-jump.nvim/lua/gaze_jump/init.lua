@@ -275,6 +275,7 @@ function M.calibrate()
     setup = initial.setup,
     display = vim.deepcopy(initial.display),
     path = initial.source == 'demo' and config.alignment_path .. '.demo' or config.alignment_path,
+    status = M.status,
     samples = function(since)
       local now = uv.hrtime()
       local result = {}

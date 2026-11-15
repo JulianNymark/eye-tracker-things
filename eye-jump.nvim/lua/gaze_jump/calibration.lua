@@ -66,13 +66,13 @@ local function write_at(lines, row, col, text)
   lines[row] = old:sub(1, col - 1) .. text .. old:sub(col + #text)
 end
 
-local function draw(message)
+local function draw(message, preserve_displayed)
   local s = active
   if not s or not vim.api.nvim_win_is_valid(s.win) then return end
   local target = s.targets[s.index]
   local lines = {}
   for row = 1, s.height do lines[row] = string.rep(' ', s.cols) end
-  local header = ('Eye alignment %d/%d: look at cell center, press Space; Esc cancels'):format(s.index, #s.targets)
+  local header = ('Align %d/%d: Space next | s status | Esc'):format(s.index, #s.targets)
   write_at(lines, 1, 1, header:sub(1, s.cols))
   if message then write_at(lines, 2, 1, message:sub(1, s.cols)) end
   write_at(lines, target.row - 1, target.col - 3, ' /---\\ ')
@@ -89,7 +89,23 @@ local function draw(message)
   local pos = vim.fn.screenpos(s.win, target.row, target.col)
   if pos.row <= 0 or pos.col <= 0 then close(); vim.notify('Gaze alignment: target is not visible', vim.log.levels.ERROR); return end
   s.target = { row = pos.row, col = pos.col }
-  s.displayed = uv.hrtime()
+  if not preserve_displayed then s.displayed = uv.hrtime() end
+end
+
+local function show_status()
+  local s = active
+  if not s then return end
+  local state = s.opts.status()
+  local samples = s.opts.samples(s.displayed)
+  local span, age = '-', '-'
+  if #samples > 0 then
+    span = tostring(math.floor((samples[#samples].received - samples[1].received) / 1e6))
+    age = tostring(math.floor((uv.hrtime() - samples[#samples].received) / 1e6))
+  end
+  local point = state.point and ('%.2f,%.2f'):format(state.point.x, state.point.y) or '-'
+  local gaze = state.ready and 'ok' or (state.point and 'stale' or 'none')
+  draw(('B:%s G:%s N:%d S:%s A:%s P:%s'):format(
+    state.connected and 'up' or 'down', gaze, #samples, span, age, point), true)
 end
 
 local function collect()
@@ -172,6 +188,7 @@ function M.start(opts)
   active = { opts = opts, rows = rows, cols = cols, height = height, targets = targets,
     index = 1, samples = {}, buf = buf, win = win }
   vim.keymap.set('n', '<Space>', collect, { buffer = buf, nowait = true, silent = true })
+  vim.keymap.set('n', 's', show_status, { buffer = buf, nowait = true, silent = true })
   vim.keymap.set('n', '<Esc>', function() close(); vim.notify('Gaze alignment cancelled') end,
     { buffer = buf, nowait = true, silent = true })
   vim.api.nvim_create_autocmd({ 'WinClosed', 'VimResized' }, {

@@ -205,6 +205,11 @@ grid to the tracker's calibrated display coordinates. It reports the fit error
 and rejects highly inconsistent or degenerate samples. This is **not Tobii
 tracker calibration**: it does not write the device or tracker profile.
 
+Press `s` during alignment to show a snapshot without advancing: `B` is bridge
+connection, `G` is gaze freshness, `N` is the number of usable recent samples,
+`S` is their time span in milliseconds, `A` is the newest sample's age in
+milliseconds, and `P` is the latest normalized display point, if available.
+
 Successful alignment is saved in Neovim's state directory under
 `eye-jump/alignment.json`; only fit coefficients and setup metadata are saved,
 not the samples. Demo alignment uses a separate file. Saved alignment is loaded

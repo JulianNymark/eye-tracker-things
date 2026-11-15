@@ -4,8 +4,11 @@ local calibration = require('gaze_jump.calibration')
 vim.o.columns = 80
 vim.o.lines = 24
 
+local last_since
 calibration.start({
-  samples = function()
+  status = function() return { connected = true, ready = true, point = { x = 0.25, y = 0.75 } } end,
+  samples = function(since)
+    last_since = since
     local now = uv.hrtime()
     local frame = { point = { x = 0.5, y = 0.5 } }
     return { { received = now - 100000000, frame = frame },
@@ -26,10 +29,27 @@ local function check_target()
   local pos = vim.fn.screenpos(win, mark[2] + 1, mark[3] + 1)
   local target = assert(calibration.target())
   assert(pos.row == target.row and pos.col == target.col, 'highlight and fitted target differ')
+  return mark[2] + 1, mark[3] + 1
 end
 
 check_target()
 vim.api.nvim_feedkeys(' ', 'xt', false)
-check_target()
+local top, left = check_target()
+assert(top == 4 and left == 5, 'original top-left target should be restored')
+vim.api.nvim_feedkeys('s', 'xt', false)
+local since = last_since
+local status = vim.api.nvim_buf_get_lines(0, 1, 2, false)[1]
+assert(status:find('B:up G:ok N:3', 1, true) and status:find('P:0.25,0.75', 1, true), status)
+local same_top, same_left = check_target()
+assert(same_top == top and same_left == left, 'status must not advance calibration')
+vim.api.nvim_feedkeys('s', 'xt', false)
+assert(last_since == since, 'status must not reset sample collection')
+vim.api.nvim_feedkeys(' ', 'xt', false)
+local top_right, right = check_target()
+assert(top_right == top and right == 80 - left + 1, 'top targets must be symmetric')
+vim.api.nvim_feedkeys(' ', 'xt', false)
+local bottom, bottom_right = check_target()
+assert(bottom == (vim.o.lines - vim.o.cmdheight) - 2 and bottom_right == right,
+  'original bottom-right target should be restored')
 calibration.cancel()
 print('Calibration target passed')
