@@ -13,7 +13,7 @@ import type { DisplayInfo } from './shared/model';
 import { setupIdentity } from './setup-identity';
 
 process.umask(0o077);
-const socketPath = process.env.GAZE_JUMP_SOCKET ?? join(homedir(), '.local', 'share', 'eye-jump', 'gaze.sock');
+const socketPath = process.env.EYE_JUMP_SOCKET ?? join(homedir(), '.local', 'share', 'eye-jump', 'gaze.sock');
 const ownProfilePath = join(homedir(), '.local', 'share', 'eye-jump', 'tracker-calibration.json');
 const args = process.argv.slice(2);
 const demo = args.includes('--demo');

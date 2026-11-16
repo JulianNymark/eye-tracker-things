@@ -8,13 +8,13 @@ local state = assert(vim.env.GAZE_TEST_DIR)
 
 require('lazy').setup({
   {
-    dir = vim.fn.getcwd(), name = 'eye-jump', main = 'gaze_jump', event = 'VeryLazy',
+    dir = vim.fn.getcwd(), name = 'eye-jump', main = 'eye_jump', event = 'VeryLazy',
     opts = { socket = socket, alignment_path = state .. '/alignment.json', max_age_ms = 2000 },
     keys = {
-      { 'S', function() require('gaze_jump').jump() end, desc = 'Jump near gaze' },
-      { '<leader>ec', function() require('gaze_jump').calibrate() end, desc = 'Calibrate eye alignment' },
-      { '<leader>es', function() require('gaze_jump').show_status() end, desc = 'Eye tracker status' },
-      { '<leader>te', function() require('gaze_jump').toggle_debug() end, desc = 'Toggle gaze marker' },
+      { 'S', function() require('eye_jump').jump() end, desc = 'Jump near gaze' },
+      { '<leader>ec', function() require('eye_jump').calibrate() end, desc = 'Calibrate eye alignment' },
+      { '<leader>es', function() require('eye_jump').show_status() end, desc = 'Eye tracker status' },
+      { '<leader>te', function() require('eye_jump').toggle_debug() end, desc = 'Toggle gaze marker' },
     },
   },
 }, {
@@ -23,13 +23,13 @@ require('lazy').setup({
   rocks = { enabled = false }, performance = { cache = { enabled = false } },
 })
 
-assert(package.loaded.gaze_jump == nil, 'plugin should not load during startup')
+assert(package.loaded.eye_jump == nil, 'plugin should not load during startup')
 assert(vim.fn.maparg(' te', 'n', false, true).desc == 'Toggle gaze marker', 'lazy keybinding was not registered')
 vim.api.nvim_feedkeys(' te', 'xt', false)
-assert(vim.wait(2000, function() return package.loaded.gaze_jump ~= nil end, 10), 'keybinding did not load the plugin')
-local jump = require('gaze_jump')
+assert(vim.wait(2000, function() return package.loaded.eye_jump ~= nil end, 10), 'keybinding did not load the plugin')
+local jump = require('eye_jump')
 assert(vim.wait(3000, function() return jump.status().ready and jump.status().aligned end, 10), 'lazy-loaded plugin did not connect or restore alignment')
-assert(require('gaze_jump.debug').status().enabled, 'toggle did not run after lazy load')
+assert(require('eye_jump.debug').status().enabled, 'toggle did not run after lazy load')
 assert(vim.fn.maparg('S', 'n', false, true).desc == 'Jump near gaze')
 assert(vim.fn.maparg(' ec', 'n', false, true).desc == 'Calibrate eye alignment')
 assert(vim.fn.maparg(' es', 'n', false, true).desc == 'Eye tracker status')

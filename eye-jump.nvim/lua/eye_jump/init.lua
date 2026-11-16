@@ -1,7 +1,7 @@
 local M = {}
 local uv = vim.uv or vim.loop
-local alignment = require('gaze_jump.alignment')
-local search_area = require('gaze_jump.search_area')
+local alignment = require('eye_jump.alignment')
+local search_area = require('eye_jump.search_area')
 
 local config
 local current
@@ -13,7 +13,7 @@ local retry
 local stopped = true
 local correction
 local correction_group
-local correction_keys = vim.api.nvim_create_namespace('gaze_jump.correction')
+local correction_keys = vim.api.nvim_create_namespace('eye_jump.correction')
 
 local function finite(value)
   return type(value) == 'number' and value == value and math.abs(value) < math.huge
@@ -93,8 +93,8 @@ function M.stop()
   correction = nil
   if correction_group then vim.api.nvim_del_augroup_by_id(correction_group); correction_group = nil end
   vim.on_key(nil, correction_keys)
-  require('gaze_jump.debug').stop()
-  require('gaze_jump.calibration').cancel()
+  require('eye_jump.debug').stop()
+  require('eye_jump.calibration').cancel()
   disconnect()
   if retry and not retry:is_closing() then retry:stop(); retry:close() end
   retry = nil
@@ -308,7 +308,7 @@ function M.setup(opts)
   local v = opts.viewport
   assert(v == nil or (type(v) == 'table' and finite(v.x) and finite(v.y) and finite(v.width) and finite(v.height)
     and v.x >= 0 and v.y >= 0 and v.width > 0 and v.height > 0
-    and v.x + v.width <= 1 and v.y + v.height <= 1), 'gaze_jump: invalid viewport')
+    and v.x + v.width <= 1 and v.y + v.height <= 1), 'eye_jump: invalid viewport')
   config = {
     case_mode = opts.case_mode == nil and 'smart' or opts.case_mode,
     search_radius = opts.search_radius == nil and 10 or opts.search_radius,
@@ -319,17 +319,17 @@ function M.setup(opts)
     allow_demo = opts.allow_demo == true,
     alignment_path = opts.alignment_path or (vim.fn.stdpath('state') .. '/eye-jump/alignment.json'),
   }
-  assert(finite(config.max_age_ms) and config.max_age_ms > 0, 'gaze_jump: invalid max_age_ms')
+  assert(finite(config.max_age_ms) and config.max_age_ms > 0, 'eye_jump: invalid max_age_ms')
   assert(config.case_mode == 'smart' or config.case_mode == 'sensitive' or config.case_mode == 'insensitive',
-    'gaze_jump: invalid case_mode')
-  assert(finite(config.search_radius) and config.search_radius > 0, 'gaze_jump: invalid search_radius')
-  local calibration = require('gaze_jump.calibration')
+    'eye_jump: invalid case_mode')
+  assert(finite(config.search_radius) and config.search_radius > 0, 'eye_jump: invalid search_radius')
+  local calibration = require('eye_jump.calibration')
   fitted = {
     tobii = calibration.load(config.alignment_path),
     demo = calibration.load(config.alignment_path .. '.demo'),
   }
   stopped = false
-  correction_group = vim.api.nvim_create_augroup('GazeJumpCorrection', { clear = true })
+  correction_group = vim.api.nvim_create_augroup('EyeJumpCorrection', { clear = true })
   vim.api.nvim_create_autocmd({ 'CursorMoved', 'WinScrolled', 'WinResized', 'VimResized' }, {
     group = correction_group, callback = function() correction_valid() end,
   })
@@ -350,9 +350,9 @@ function M.show_status()
 end
 
 function M.toggle_debug()
-  local enabled = require('gaze_jump.debug').toggle(function()
+  local enabled = require('eye_jump.debug').toggle(function()
     if stopped or not current or (uv.hrtime() - current.received) / 1e6 > config.max_age_ms or
-        require('gaze_jump.calibration').target() then return nil end
+        require('eye_jump.calibration').target() then return nil end
     local transform = M.active_transform(current.frame)
     return transform and { transform = transform, point = current.frame.point, display = current.frame.display,
       search_radius = config.search_radius, show_search_radius = config.show_search_radius } or nil
@@ -367,7 +367,7 @@ function M.calibrate()
     return
   end
   local initial = current.frame
-  require('gaze_jump.calibration').start({
+  require('eye_jump.calibration').start({
     source = initial.source,
     setup = initial.setup,
     display = vim.deepcopy(initial.display),

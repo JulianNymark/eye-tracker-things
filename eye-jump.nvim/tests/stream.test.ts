@@ -38,7 +38,7 @@ test('demo bridge produces synthetic gaze without hardware', { timeout: 10000 },
   const dir = await mkdtemp(join(tmpdir(), 'gaze-demo-'));
   const path = join(dir, 'gaze.sock');
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/bridge.ts', '--demo'], {
-    env: { ...process.env, GAZE_JUMP_SOCKET: path },
+    env: { ...process.env, EYE_JUMP_SOCKET: path },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const exited = once(child, 'exit');

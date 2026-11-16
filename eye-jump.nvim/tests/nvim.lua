@@ -1,8 +1,8 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
 vim.g.mapleader = ' '
-local jump = require('gaze_jump')
-local alignment = require('gaze_jump.alignment')
-local debug_marker = require('gaze_jump.debug')
+local jump = require('eye_jump')
+local alignment = require('eye_jump.alignment')
+local debug_marker = require('eye_jump.debug')
 vim.opt.number = false
 vim.opt.signcolumn = 'no'
 vim.opt.wrap = false
@@ -119,7 +119,7 @@ local frame = near(2, 8)
 frame.version = 1
 frame.source = 'demo'
 local valid_case, case_error = pcall(jump.setup, { case_mode = 'invalid' })
-assert(not valid_case and case_error:find('gaze_jump: invalid case_mode', 1, true), 'invalid case_mode accepted')
+assert(not valid_case and case_error:find('eye_jump: invalid case_mode', 1, true), 'invalid case_mode accepted')
 server:listen(1, function(err)
   assert(not err, err)
   peer = uv.new_pipe(false)
@@ -187,7 +187,7 @@ assert(vim.wait(2000, function()
 end, 10), 'marker did not return after hiding the tabline')
 jump.calibrate()
 assert(vim.wait(2000, function() return not debug_marker.status().visible end, 10), 'marker must hide during alignment')
-require('gaze_jump.calibration').cancel()
+require('eye_jump.calibration').cancel()
 assert(vim.wait(2000, function() return debug_marker.status().visible end, 10), 'marker must resume after alignment')
 vim.api.nvim_win_set_cursor(win, { 1, 0 })
 vim.api.nvim_feedkeys('Sx', 'xt', false)
@@ -207,7 +207,7 @@ jump.stop()
 peer:close()
 
 -- Calibrate through nine drawn targets using a synthetic affine gaze stream.
-local cal = require('gaze_jump.calibration')
+local cal = require('eye_jump.calibration')
 local saved_path = vim.fn.tempname()
 local timer = uv.new_timer()
 jump.setup({ socket = path, alignment_path = saved_path, max_age_ms = 5000, allow_demo = true })

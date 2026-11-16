@@ -1,6 +1,6 @@
 local uv = vim.uv or vim.loop
-local alignment = require('gaze_jump.alignment')
-local search_area = require('gaze_jump.search_area')
+local alignment = require('eye_jump.alignment')
+local search_area = require('eye_jump.search_area')
 local M = {}
 
 local enabled = false
@@ -133,7 +133,7 @@ local function draw_boundary(sample, rows, cols, u, v)
         if not ok then win = nil end
       end
       if win then
-        vim.wo[win].winhighlight = 'Normal:GazeJumpBoundary,NormalFloat:GazeJumpBoundary'
+        vim.wo[win].winhighlight = 'Normal:EyeJumpBoundary,NormalFloat:EyeJumpBoundary'
         vim.wo[win].winblend = 40
         next_windows[run.key] = win
       end
@@ -185,7 +185,7 @@ local function refresh()
     local ok, result = pcall(vim.api.nvim_open_win, buffer, false, opts)
     if not ok then hide(); return end
     window = result
-    vim.wo[window].winhighlight = 'Normal:GazeJumpMarker,NormalFloat:GazeJumpMarker'
+    vim.wo[window].winhighlight = 'Normal:EyeJumpMarker,NormalFloat:EyeJumpMarker'
     vim.wo[window].winblend = 0
   end
   position = { row = row, col = col }
@@ -212,8 +212,8 @@ function M.toggle(sample)
   if enabled then M.stop(); return false end
   get_sample = sample
   enabled = true
-  vim.api.nvim_set_hl(0, 'GazeJumpMarker', { fg = '#161616', bg = '#ffdd00', bold = true, default = true })
-  vim.api.nvim_set_hl(0, 'GazeJumpBoundary', { fg = '#888888', bg = '#202020', default = true })
+  vim.api.nvim_set_hl(0, 'EyeJumpMarker', { fg = '#161616', bg = '#ffdd00', bold = true, default = true })
+  vim.api.nvim_set_hl(0, 'EyeJumpBoundary', { fg = '#888888', bg = '#202020', default = true })
   timer = uv.new_timer()
   timer:start(0, 33, function()
     if refresh_pending then return end

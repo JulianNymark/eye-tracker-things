@@ -1,7 +1,7 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
-local jump = require('gaze_jump')
-local search_area = require('gaze_jump.search_area')
-local debug_marker = require('gaze_jump.debug')
+local jump = require('eye_jump')
+local search_area = require('eye_jump.search_area')
+local debug_marker = require('eye_jump.debug')
 local uv = vim.uv or vim.loop
 vim.o.columns, vim.o.lines = 80, 24
 vim.o.number, vim.o.relativenumber, vim.o.wrap = false, false, false
@@ -66,7 +66,7 @@ equal(#jump.find_candidates(win, 'z', frame, viewport, rows, cols), 0)
 equal(#jump.find_candidates(win, 'x', near(11, 31), viewport, rows, cols), 0)
 for _, radius in ipairs({ 0, -1, math.huge, '10', false }) do
   local ok, err = pcall(jump.setup, { search_radius = radius })
-  assert(not ok and err:find('gaze_jump: invalid search_radius', 1, true), 'invalid radius accepted')
+  assert(not ok and err:find('eye_jump: invalid search_radius', 1, true), 'invalid radius accepted')
 end
 
 local path = vim.fn.tempname()

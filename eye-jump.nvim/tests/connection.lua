@@ -1,6 +1,6 @@
 vim.opt.runtimepath:prepend(assert(vim.env.GAZE_TEST_PLUGIN))
 local uv = vim.uv or vim.loop
-local jump = require('gaze_jump')
+local jump = require('eye_jump')
 local path = vim.fn.tempname()
 local notifications = {}
 vim.notify = function(message) notifications[#notifications + 1] = message end

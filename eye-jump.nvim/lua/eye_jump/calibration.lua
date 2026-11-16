@@ -1,8 +1,8 @@
 local uv = vim.uv or vim.loop
-local alignment = require('gaze_jump.alignment')
+local alignment = require('eye_jump.alignment')
 local M = {}
 local active
-local target_ns = vim.api.nvim_create_namespace('gaze_jump_calibration_target')
+local target_ns = vim.api.nvim_create_namespace('eye_jump_calibration_target')
 
 local function finite(n)
   return type(n) == 'number' and n == n and math.abs(n) < math.huge
@@ -82,7 +82,7 @@ local function draw(message, preserve_displayed)
   vim.api.nvim_buf_set_lines(s.buf, 0, -1, false, lines)
   vim.api.nvim_buf_clear_namespace(s.buf, target_ns, 0, -1)
   vim.api.nvim_buf_set_extmark(s.buf, target_ns, target.row - 1, target.col - 1, {
-    end_col = target.col, hl_group = 'GazeJumpCalibrationTarget',
+    end_col = target.col, hl_group = 'EyeJumpCalibrationTarget',
   })
   vim.bo[s.buf].modifiable = false
   vim.cmd('redraw')
@@ -173,7 +173,7 @@ function M.start(opts)
     { row = bottom, col = midx }, { row = midy, col = left },
   }
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_set_hl(0, 'GazeJumpCalibrationTarget', { bg = '#ffdd00', default = true })
+  vim.api.nvim_set_hl(0, 'EyeJumpCalibrationTarget', { bg = '#ffdd00', default = true })
   vim.bo[buf].bufhidden = 'wipe'
   local win = vim.api.nvim_open_win(buf, true, {
     relative = 'editor', row = 0, col = 0, width = cols, height = height,
