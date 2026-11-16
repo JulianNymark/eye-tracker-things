@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) · [Bridge guide](bridge.md)
 
-Eye jump uses two separate calibrations: the bridge calibrates the tracker against a display, and the plugin aligns Neovim's grid to that display. The latter is required for jumps unless a manual viewport is configured. The fullscreen window and tracker calibration are experimental and have not yet been tested together on real hardware.
+Eye jump uses two separate calibrations: the bridge calibrates the tracker against a display, and the plugin aligns Neovim's grid to that display. The latter is required for jumps unless a manual viewport is configured. The fullscreen window and tracker calibration have been tested together on real hardware on two different Macs; other platforms have not been tested.
 
 ## Tracker calibration
 
@@ -18,7 +18,7 @@ After success, the bridge saves `~/.local/share/eye-jump/tracker-calibration.jso
 
 At startup the bridge checks whether saved display geometry matches exactly one SDL display that is not reported as rotated. Otherwise gaze stays disabled until you select and calibrate a display. The check is repeated after calibration, not continuously while the bridge runs, and cannot prove physical monitor identity. The bridge cannot verify changes in display arrangement, screen scale, user, or physical tracker position; keep these unchanged or recalibrate. Frames include the chosen display's ID/name, bounds and scale; SDL-created IDs are geometry-derived, not hardware IDs.
 
-On cancellation or error, the bridge attempts to reconnect and restore the previous calibration, if any. Without one, gaze stays disabled until calibration succeeds. If recovery fails, restart the bridge. A crash, unplug or device fault can prevent automatic recovery, but prior profile files are not deleted. Tracker and native-window paths have automated mock tests, but still need real-device and native GUI testing.
+On cancellation or error, the bridge attempts to reconnect and restore the previous calibration, if any. Without one, gaze stays disabled until calibration succeeds. If recovery fails, restart the bridge. A crash, unplug or device fault can prevent automatic recovery, but prior profile files are not deleted. Automated mock tests also cover tracker and native-window paths; they do not guarantee recovery from every hardware or GUI failure.
 
 ## Editor alignment
 

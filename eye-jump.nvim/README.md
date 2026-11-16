@@ -2,7 +2,7 @@
 
 Jump to a character near your gaze in Neovim, using a Tobii Eye Tracker 5 and a separate macOS bridge.
 
-> **Prototype:** The fullscreen tracker calibration and bridge have not yet been tested together on real hardware. See [limitations](#limitations-and-development) before relying on them.
+> **Hardware tested:** Working with a Tobii Eye Tracker 5 on two different Macs, including fullscreen tracker calibration and the bridge. Testing is currently limited to macOS; other platforms have not been tested. See [limitations](#limitations-and-development).
 
 ## Features
 
@@ -131,7 +131,7 @@ All functions are available from `require('eye_jump')`:
 
 ## Limitations and development
 
-Only normal mode is implemented; visual and operator-pending mappings are deliberately untouched. Real-device calibration, the native fullscreen window, terminal geometry and actual gaze accuracy remain unvalidated. Staleness is measured from local socket receipt, not the hardware timestamp.
+Only normal mode is implemented; visual and operator-pending mappings are deliberately untouched. Hardware testing is currently limited to two Macs, so compatibility with other platforms and setups is unverified. Staleness is measured from local socket receipt, not the hardware timestamp.
 
 Run the tests from the `eye-jump.nvim` directory:
 
