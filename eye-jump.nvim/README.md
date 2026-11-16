@@ -1,7 +1,7 @@
 # Eye jump
 
-macOS + Neovim prototype for Tobii Eye Tracker 5. Look near a
-character, press `s`
+macOS + Neovim prototype for Tobii Eye Tracker 5. Look near a character and
+invoke the jump action to move to it.
 
 The bridge can calibrate the tracker using a fullscreen window. The 
 nvim plugin calibrates the offset of the window within the display. So 
@@ -34,17 +34,20 @@ Connect the tracker and close any other app using it.
    nine dots. Escape cancels.
 
 3. **Open Neovim** on the tracked display in a separate terminal. With the
-   [plugin configured](#neovim-setup), use normal mode:
-   - `Space e s` — check that `ready = true`.
-   - `Space e c` — align the editor: look steadily at the center of each highlighted cell and press Space.
-     This is separate from tracker calibration and is currently required for jumps.
-   - `Space t e` — toggle a live marker showing where gaze maps in Neovim.
-   - Look near a character, then press `S` and type that character to jump.
+   [plugin configured](#neovim-setup), use its actions in normal mode:
+   - `show_status()` — check that `ready = true`.
+   - `calibrate()` — align the editor: look steadily at the center of each
+     highlighted cell and press Space. This is separate from tracker calibration
+     and is currently required for jumps.
+   - `toggle_debug()` — toggle a live marker showing where gaze maps in Neovim.
+   - Look near a character, ini brand still strong
+- Ikke prøvd å bruke Innblikk før
+
+- ryddoke `jump()`, then type that character.
 
 On later runs, start with `pnpm bridge`; the saved editor alignment is reused.
 Check the marker after moving or resizing the terminal and recalibrate when it
-looks wrong. The existing `s` Flash mapping is unchanged. Press `q` in the bridge
-terminal to stop it.
+looks wrong. Press `q` in the bridge terminal to stop it.
 
 The fullscreen window and tracker calibration are still experimental and have
 not yet been tested together on real hardware. See [tracker calibration](#tracker-calibration)
@@ -158,8 +161,9 @@ removing it.
 
 ## Neovim setup
 
-Add the repo to Neovim's runtime path, then configure the plugin and your own
-keybindings. Example using lazy.nvim:
+The plugin installs no keybindings; choose your own. Add the repo to Neovim's
+runtime path, then configure the plugin. This lazy.nvim example suggests
+normal-mode bindings that you can customize:
 
 ```lua
 {
@@ -167,12 +171,29 @@ keybindings. Example using lazy.nvim:
   dir = vim.fn.expand('~/Repos/eye-tracker-things/eye-jump.nvim'),
   main = 'gaze_jump',
   event = 'VeryLazy',
-  opts = {},
+  opts = {
+    case_mode = 'smart', -- 'smart' (default), 'sensitive', or 'insensitive'
+    search_radius = 10, -- positive finite radius in character widths
+    show_search_radius = true, -- show the boundary with the live marker
+  },
   keys = {
-    { 'S', function() require('gaze_jump').jump() end, desc = 'Jump near gaze' },
+    { '<leader>ej', function() require('gaze_jump').jump() end, desc = 'Jump near gaze' },
     { '<leader>ec', function() require('gaze_jump').calibrate() end, desc = 'Calibrate eye alignment' },
     { '<leader>es', function() require('gaze_jump').show_status() end, desc = 'Eye tracker status' },
     { '<leader>te', function() require('gaze_jump').toggle_debug() end, desc = 'Toggle gaze marker' },
+    -- Optional: correct a gaze jump, otherwise preserve native ; and ,.
+    { ';', function()
+      local gaze = require('gaze_jump')
+      if not gaze.next_candidate() then
+        vim.cmd.normal({ tostring(vim.v.count1) .. ';', bang = true })
+      end
+    end, mode = 'n', desc = 'Next gaze candidate or native repeat' },
+    { ',', function()
+      local gaze = require('gaze_jump')
+      if not gaze.previous_candidate() then
+        vim.cmd.normal({ tostring(vim.v.count1) .. ',', bang = true })
+      end
+    end, mode = 'n', desc = 'Previous gaze candidate or native repeat' },
   },
 }
 ```
@@ -181,31 +202,21 @@ keybindings. Example using lazy.nvim:
 the repository URL or `owner/repository`; keep `main`, `opts`, and your chosen
 keys. lazy.nvim loads the Neovim plugin only—the bridge remains a separate
 process that you install and start from the checkout.
+You can choose another jump key, such as `s`. The optional `;` and `,`
+mappings are normal-mode only and fall back to their native commands when
+there is no valid correction session.
 
-The plugin does not install keybindings; configure whichever ones you prefer.
 `require('gaze_jump').status().connected` reports the bridge socket connection;
 `ready` additionally requires a recent valid gaze sample. A connected bridge
 can still lack gaze, for example while the tracker is being calibrated.
-With the example above, start the bridge, open Neovim, then use these
-normal-mode mappings:
-
-| Keys | Action |
-| --- | --- |
-| `S` + character | Jump to the closest visible match near your gaze |
-| `<leader>ec` | Calibrate the editor grid against gaze |
-| `<leader>es` | Show gaze and alignment status |
-| `<leader>te` | Toggle the live gaze marker |
-
-If another plugin maps `S`, remove its normal-mode mapping or ensure eye-jump
-loads afterward. Existing `s` mappings are untouched. The example only defines
-normal-mode mappings.
 
 ### Editor alignment
 
-Press `<leader>ec`. For each of nine targets, look steadily at the center of the
-highlighted cell and press Space. Escape cancels without replacing the previous alignment. The
-plugin averages recent valid samples and fits an affine mapping from Neovim's
-grid to the tracker's calibrated display coordinates. It reports the fit error
+Invoke `require('gaze_jump').calibrate()`. For each of nine targets, look
+steadily at the center of the highlighted cell and press Space. Escape cancels
+without replacing the previous alignment. The plugin averages recent valid
+samples and fits an affine mapping from Neovim's grid to the tracker's
+calibrated display coordinates. It reports the fit error
 and rejects highly inconsistent or degenerate samples. This is **not Tobii
 tracker calibration**: it does not write the device or tracker profile.
 
@@ -229,23 +240,44 @@ terminal grid stays on the tracked display. Automatic window/grid geometry
 discovery is not yet implemented; the operating system's outer window rectangle
 alone does not account for terminal padding and tmux panes.
 
-`<leader>es` shows `ready = false` if there is no recent valid gaze and
+`show_status()` shows `ready = false` if there is no recent valid gaze and
 `aligned = false` if alignment is unavailable for the current setup. If gaze is
 available, `alignment` explains whether the saved calibration is ready,
-resized, missing, or belongs to another tracker setup. If gaze is
-outside the editor or the character has no visible match, the cursor stays put.
-Escape cancels character input. The plugin snapshots gaze when `S` is pressed,
-not after the character is typed. It ranks by distance on the display rather
-than distance in character cells. The squared Euclidean score is calculated in
-the fitted tracker-gaze coordinate space; calibration error or a sheared fit can
-make it differ from exact screen-space distance. Ties choose the first visible
-match. Matches hidden inside closed folds are skipped.
+resized, missing, or belongs to another tracker setup. Escape cancels character
+input. By default, matching uses smart case: a lowercase
+character matches either case; an uppercase character matches exact case.
+Set `case_mode = 'sensitive'` to always match exact case, or `'insensitive'` to
+always ignore case. Matching supports Unicode and is independent of Neovim's
+`'ignorecase'` and `'smartcase'` options.
 
-The `<leader>te` marker displays the latest mapped gaze as a colored dot in the
-editor. It does not move the cursor or change the buffer. It disappears when
-gaze is invalid, stale, outside the editor, or during editor alignment. The
-marker is live: the jump uses the sample captured when `S` was pressed, which
-may differ from where the marker moves afterward. No gaze data is logged.
+`jump()` captures gaze when invoked, then instantly selects the nearest matching
+visible character within that captured search radius once the character is typed.
+If gaze is outside the editor or there is no match within the radius, the cursor
+stays put. `search_radius` defaults to 10 character widths and must be a positive
+finite number. The calibrated display-space search area is circular and respects
+the aspect ratio of character cells. Matches hidden inside closed folds are
+skipped. Distance is calculated in the fitted tracker-gaze coordinate space;
+calibration error or a sheared fit can make it differ from exact screen-space
+distance.
+
+The jump freezes all matching candidates within the radius, without a count cap,
+ordered by their original gaze distance, with ties ordered by line and byte
+position. `next_candidate()` and `previous_candidate()` traverse that list
+without wrapping. They return `true` when the correction is handled, including
+at either end of the list, and `false` when there is no valid correction session.
+There is no timeout or resampling: later gaze movement or staleness does not
+change the frozen candidates. The session ends on unrelated movement, editing,
+buffer, window or layout changes, entering insert mode, a new jump, calibration
+or stop. Native `f`, `F`, `t` and `T` also cancel it, even if they do not move
+the cursor.
+
+The marker toggled by `toggle_debug()` displays the latest mapped gaze as a
+colored dot in the editor, with an ASCII search-radius boundary by default. Set
+`show_search_radius = false` to hide the boundary. Both are live, not a frozen
+outline after a jump: the jump uses the sample captured when `jump()` was
+invoked, which may differ from where the marker moves afterward. The marker does
+not move the cursor or change the buffer. It disappears when gaze is invalid,
+stale, outside the editor, or during editor alignment. No gaze data is logged.
 
 For synthetic testing, opt in with `require('gaze_jump').setup({ allow_demo = true })`
 and run `pnpm bridge --demo`. The moving demo points are not useful for a real

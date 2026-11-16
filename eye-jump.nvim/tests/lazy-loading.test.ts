@@ -17,7 +17,7 @@ test('lazy.nvim loads the local plugin via user-owned mappings',
     for (const name of ['config', 'data', 'state', 'cache']) await mkdir(join(directory, name));
     const server = createServer(client => {
       const publish = (): void => { client.write(JSON.stringify({ version: 1, source: 'tobii', setup: 'test',
-        display: alignment.display, point: { x: 0.5, y: 0.5 } }) + '\n'); };
+        display: alignment.display, point: { x: 2.5 / 80, y: 0.5 / 24 } }) + '\n'); };
       const timer = setInterval(publish, 30);
       client.on('error', () => undefined);
       client.on('close', () => clearInterval(timer));

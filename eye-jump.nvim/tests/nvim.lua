@@ -56,8 +56,41 @@ equal(jump.find_nearest(win, 'ø', near(4, 10), viewport, rows, cols), { 4, 9 })
 equal(jump.find_nearest(win, '!', near(1, 7), viewport, rows, cols), nil)
 equal(jump.find_nearest(win, 'x', near(1, 7), { x = 0.8, y = 0.8, width = 0.2, height = 0.2 }, rows, cols), nil)
 
--- Distance is measured in display units, not raw normalized x/y values.
 local original_lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+
+-- Lowercase input ignores case; uppercase input is exact, regardless of search options.
+local literal_characters = [[. * [ ] ^ $ ~ \]]
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'x X x', 'ø Ø ø', 'İ x K k', literal_characters })
+vim.cmd('redraw!')
+for _, ignorecase in ipairs({ false, true }) do
+  for _, smartcase in ipairs({ false, true }) do
+    vim.o.ignorecase = ignorecase
+    vim.o.smartcase = smartcase
+    equal(jump.find_nearest(win, 'x', near(1, 3), viewport, rows, cols), { 1, 2 })
+    equal(jump.find_nearest(win, 'x', near(1, 5), viewport, rows, cols), { 1, 4 })
+    equal(jump.find_nearest(win, 'X', near(1, 5), viewport, rows, cols), { 1, 2 })
+    equal(jump.find_nearest(win, 'ø', near(2, 4), viewport, rows, cols), { 2, 3 })
+    equal(jump.find_nearest(win, 'Ø', near(2, 7), viewport, rows, cols), { 2, 3 })
+    -- Unicode text before a match must not shift its original byte column.
+    equal(jump.find_nearest(win, 'x', near(3, 4), viewport, rows, cols), { 3, 3 })
+    equal(jump.find_nearest(win, 'k', near(3, 10), viewport, rows, cols), { 3, 9 })
+    equal(jump.find_nearest(win, 'K', near(3, 10), viewport, rows, cols), nil)
+    equal(jump.find_nearest(win, 'Z', near(1, 1), viewport, rows, cols), nil)
+    equal(jump.find_nearest(win, 'x', near(1, 3), viewport, rows, cols, 'smart'), { 1, 2 })
+    equal(jump.find_nearest(win, 'x', near(1, 3), viewport, rows, cols, 'sensitive'), { 1, 0 })
+    equal(jump.find_nearest(win, 'X', near(1, 5), viewport, rows, cols, 'sensitive'), { 1, 2 })
+    equal(jump.find_nearest(win, 'X', near(1, 5), viewport, rows, cols, 'insensitive'), { 1, 4 })
+    equal(jump.find_nearest(win, 'Ø', near(2, 7), viewport, rows, cols, 'insensitive'), { 2, 6 })
+    for col = 1, 15, 2 do
+      local character = literal_characters:sub(col, col)
+      equal(jump.find_nearest(win, character, near(4, col), viewport, rows, cols), { 4, col - 1 })
+    end
+  end
+end
+vim.o.ignorecase = false
+vim.o.smartcase = false
+
+-- Distance is measured in display units, not raw normalized x/y values.
 vim.api.nvim_buf_set_lines(0, 0, -1, false, { '....x', '......x' })
 vim.cmd('redraw!')
 local top = vim.fn.screenpos(win, 1, 5)
@@ -72,7 +105,7 @@ vim.wo[win].foldmethod = 'manual'
 vim.cmd('1,3fold')
 vim.cmd('redraw!')
 assert(vim.fn.foldclosed(2) ~= -1, 'test fold did not close')
-equal(jump.find_nearest(win, 'x', near(1, 1), viewport, rows, cols), { 4, 11 })
+equal(jump.find_nearest(win, 'x', near(1, 1), viewport, rows, cols, 'smart', 20), { 4, 11 })
 vim.cmd('normal! zE')
 vim.cmd('redraw!')
 
@@ -85,6 +118,8 @@ local peer
 local frame = near(2, 8)
 frame.version = 1
 frame.source = 'demo'
+local valid_case, case_error = pcall(jump.setup, { case_mode = 'invalid' })
+assert(not valid_case and case_error:find('gaze_jump: invalid case_mode', 1, true), 'invalid case_mode accepted')
 server:listen(1, function(err)
   assert(not err, err)
   peer = uv.new_pipe(false)
@@ -162,6 +197,12 @@ assert(vim.wait(2000, function() return not jump.status().ready end, 10), 'inval
 assert(vim.wait(2000, function() return not debug_marker.status().visible end, 10), 'marker must hide on invalid gaze')
 vim.api.nvim_feedkeys(' te', 'xt', false)
 assert(not debug_marker.status().enabled, 'marker did not toggle off')
+peer:close()
+jump.setup({ viewport = viewport, socket = path, max_age_ms = 5000, allow_demo = true, case_mode = 'insensitive' })
+assert(vim.wait(2000, function() return jump.status().ready end, 10), 'no gaze after case mode change')
+vim.api.nvim_win_set_cursor(win, { 1, 0 })
+vim.api.nvim_feedkeys('SX', 'xt', false)
+equal(vim.api.nvim_win_get_cursor(win), { 2, 7 })
 jump.stop()
 peer:close()
 
@@ -246,3 +287,4 @@ server:close()
 uv.fs_unlink(path)
 
 print('Neovim eye-jump tests passed')
+dofile('tests/candidates.lua')

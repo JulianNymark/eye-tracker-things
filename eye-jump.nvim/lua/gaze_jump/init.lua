@@ -1,6 +1,7 @@
 local M = {}
 local uv = vim.uv or vim.loop
 local alignment = require('gaze_jump.alignment')
+local search_area = require('gaze_jump.search_area')
 
 local config
 local current
@@ -10,6 +11,9 @@ local connection
 local connected = false
 local retry
 local stopped = true
+local correction
+local correction_group
+local correction_keys = vim.api.nvim_create_namespace('gaze_jump.correction')
 
 local function finite(value)
   return type(value) == 'number' and value == value and math.abs(value) < math.huge
@@ -86,6 +90,9 @@ end
 
 function M.stop()
   stopped = true
+  correction = nil
+  if correction_group then vim.api.nvim_del_augroup_by_id(correction_group); correction_group = nil end
+  vim.on_key(nil, correction_keys)
   require('gaze_jump.debug').stop()
   require('gaze_jump.calibration').cancel()
   disconnect()
@@ -149,16 +156,23 @@ function M.active_transform(frame)
 end
 
 -- Transform normalized editor-grid coordinates to normalized display gaze.
-function M.find_nearest(win, character, frame, mapping, rows, cols)
+function M.find_candidates(win, character, frame, mapping, rows, cols, case_mode, search_radius)
   local transform = type(mapping.x) == 'table' and mapping or viewport_transform(mapping)
+  -- Explicit case flags keep smart-case matching independent of search options.
+  -- Match the original text so Unicode case conversion cannot shift byte columns.
+  local ignore_case = case_mode == 'insensitive' or
+    ((case_mode == nil or case_mode == 'smart') and character == vim.fn.tolower(character))
+  local case = ignore_case and '\\c' or '\\C'
+  local pattern = case .. '\\V' .. vim.fn.escape(character, '\\')
   local p = frame.point
   local u, v = alignment.to_grid(transform, p.x, p.y)
-  if not u or u < 0 or u > 1 or v < 0 or v > 1 then return nil end
+  if not u or u < 0 or u > 1 or v < 0 or v > 1 then return {} end
+  local area = search_area.new(transform, frame, rows, cols, search_radius or 10)
   local buffer = vim.api.nvim_win_get_buf(win)
   local first = vim.fn.line('w0', win)
   local last = vim.fn.line('w$', win)
   local lines = vim.api.nvim_buf_get_lines(buffer, first - 1, last, false)
-  local best, best_distance
+  local candidates = {}
   for i, text in ipairs(lines) do
     -- screenpos() maps hidden folded lines to the fold header; they are not
     -- visible jump targets and would otherwise compete at the same position.
@@ -170,26 +184,83 @@ function M.find_nearest(win, character, frame, mapping, rows, cols)
       folded = vim.api.nvim_win_call(win, function() return vim.fn.foldclosed(line_number) ~= -1 end)
     end
     if not folded then
-      local start = 1
+      local start = 0
       while true do
-        local col = text:find(character, start, true)
-        if not col then break end
+        local match = vim.fn.matchstrpos(text, pattern, start)
+        if match[2] == -1 then break end
+        local col = match[2] + 1
         local pos = vim.fn.screenpos(win, line_number, col)
         if pos.row > 0 and pos.col > 0 and pos.row <= rows and pos.col <= cols then
-          local x, y = alignment.to_gaze(transform, (pos.col - 0.5) / cols, (pos.row - 0.5) / rows)
-          local dx = (x - p.x) * frame.display.width
-          local dy = (y - p.y) * frame.display.height
-          local distance = dx * dx + dy * dy
-          if not best_distance or distance < best_distance then
-            best = { line_number, col - 1 }
-            best_distance = distance
+          if area:contains(pos.row, pos.col) then
+            candidates[#candidates + 1] = { position = { line_number, col - 1 },
+              distance = area:distance(pos.row, pos.col) }
           end
         end
-        start = col + #character
+        start = match[3]
       end
     end
   end
-  return best
+  table.sort(candidates, function(a, b)
+    if a.distance ~= b.distance then return a.distance < b.distance end
+    if a.position[1] ~= b.position[1] then return a.position[1] < b.position[1] end
+    return a.position[2] < b.position[2]
+  end)
+  return candidates
+end
+
+function M.find_nearest(win, character, frame, mapping, rows, cols, case_mode, search_radius)
+  local candidates = M.find_candidates(win, character, frame, mapping, rows, cols, case_mode, search_radius)
+  return candidates[1] and candidates[1].position or nil
+end
+
+local function correction_view(win)
+  return vim.api.nvim_win_call(win, function()
+    local view = vim.fn.winsaveview()
+    return { topline = view.topline, leftcol = view.leftcol, skipcol = view.skipcol, topfill = view.topfill,
+      position = vim.api.nvim_win_get_position(win), width = vim.api.nvim_win_get_width(win),
+      height = vim.api.nvim_win_get_height(win), rows = vim.o.lines, cols = vim.o.columns }
+  end)
+end
+
+local function correction_valid()
+  if not correction then return false end
+  local state = correction
+  if not vim.api.nvim_win_is_valid(state.win) or vim.api.nvim_get_current_win() ~= state.win or
+      vim.api.nvim_win_get_buf(state.win) ~= state.buffer or
+      vim.api.nvim_buf_get_changedtick(state.buffer) ~= state.changedtick or
+      not vim.deep_equal(vim.api.nvim_win_get_cursor(state.win), state.candidates[state.index].position) or
+      not vim.deep_equal(correction_view(state.win), state.view) then
+    correction = nil
+    return false
+  end
+  return true
+end
+
+local function cycle_candidate(step)
+  if not correction_valid() then return false end
+  local state = correction
+  local index = state.index + step
+  if index < 1 or index > #state.candidates then
+    return true
+  end
+  local target = state.candidates[index].position
+  local pos = vim.fn.screenpos(state.win, target[1], target[2] + 1)
+  if vim.fn.foldclosed(target[1]) ~= -1 or pos.row <= 0 or pos.col <= 0 then
+    correction = nil
+    return false
+  end
+  state.index = index
+  vim.api.nvim_win_set_cursor(state.win, target)
+  return true
+end
+
+-- True means handled, including an exhausted set; false lets mappings fall back.
+function M.next_candidate()
+  return cycle_candidate(1)
+end
+
+function M.previous_candidate()
+  return cycle_candidate(-1)
 end
 
 local function no_gaze_message()
@@ -200,6 +271,7 @@ local function no_gaze_message()
 end
 
 function M.jump()
+  correction = nil
   local captured = current
   if not captured or (uv.hrtime() - captured.received) / 1e6 > config.max_age_ms then
     vim.notify(no_gaze_message(), vim.log.levels.WARN)
@@ -221,9 +293,13 @@ function M.jump()
     vim.notify('Eye jump: editor changed while waiting for input', vim.log.levels.WARN)
     return
   end
-  local target = M.find_nearest(win, char, captured.frame, transform, rows, cols)
-  if target then vim.api.nvim_win_set_cursor(win, target)
-  else vim.notify('Eye jump: no visible match in the configured viewport', vim.log.levels.INFO) end
+  local candidates = M.find_candidates(win, char, captured.frame, transform, rows, cols,
+    config.case_mode, config.search_radius)
+  if candidates[1] then
+    vim.api.nvim_win_set_cursor(win, candidates[1].position)
+    correction = { win = win, buffer = buffer, changedtick = vim.api.nvim_buf_get_changedtick(buffer),
+      candidates = candidates, index = 1, view = correction_view(win) }
+  else vim.notify('Eye jump: no visible match within the search radius', vim.log.levels.INFO) end
 end
 
 function M.setup(opts)
@@ -234,6 +310,9 @@ function M.setup(opts)
     and v.x >= 0 and v.y >= 0 and v.width > 0 and v.height > 0
     and v.x + v.width <= 1 and v.y + v.height <= 1), 'gaze_jump: invalid viewport')
   config = {
+    case_mode = opts.case_mode == nil and 'smart' or opts.case_mode,
+    search_radius = opts.search_radius == nil and 10 or opts.search_radius,
+    show_search_radius = opts.show_search_radius ~= false,
     viewport = vim.deepcopy(v),
     socket = opts.socket or vim.fn.expand('~/.local/share/eye-jump/gaze.sock'),
     max_age_ms = opts.max_age_ms or 200,
@@ -241,12 +320,28 @@ function M.setup(opts)
     alignment_path = opts.alignment_path or (vim.fn.stdpath('state') .. '/eye-jump/alignment.json'),
   }
   assert(finite(config.max_age_ms) and config.max_age_ms > 0, 'gaze_jump: invalid max_age_ms')
+  assert(config.case_mode == 'smart' or config.case_mode == 'sensitive' or config.case_mode == 'insensitive',
+    'gaze_jump: invalid case_mode')
+  assert(finite(config.search_radius) and config.search_radius > 0, 'gaze_jump: invalid search_radius')
   local calibration = require('gaze_jump.calibration')
   fitted = {
     tobii = calibration.load(config.alignment_path),
     demo = calibration.load(config.alignment_path .. '.demo'),
   }
   stopped = false
+  correction_group = vim.api.nvim_create_augroup('GazeJumpCorrection', { clear = true })
+  vim.api.nvim_create_autocmd({ 'CursorMoved', 'WinScrolled', 'WinResized', 'VimResized' }, {
+    group = correction_group, callback = function() correction_valid() end,
+  })
+  vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI', 'InsertEnter', 'BufLeave', 'WinLeave' }, {
+    group = correction_group, callback = function(event)
+      if correction and event.buf == correction.buffer then correction = nil end
+    end,
+  })
+  -- Native character-find commands replace ;/, even when no match moves the cursor.
+  vim.on_key(function(key)
+    if correction and key:match('^[fFtT]$') and vim.fn.mode() == 'n' then correction = nil end
+  end, correction_keys)
   connect()
 end
 
@@ -259,12 +354,14 @@ function M.toggle_debug()
     if stopped or not current or (uv.hrtime() - current.received) / 1e6 > config.max_age_ms or
         require('gaze_jump.calibration').target() then return nil end
     local transform = M.active_transform(current.frame)
-    return transform and { transform = transform, point = current.frame.point } or nil
+    return transform and { transform = transform, point = current.frame.point, display = current.frame.display,
+      search_radius = config.search_radius, show_search_radius = config.show_search_radius } or nil
   end)
   vim.notify(enabled and 'Gaze marker on' or 'Gaze marker off')
 end
 
 function M.calibrate()
+  correction = nil
   if not current or (uv.hrtime() - current.received) / 1e6 > config.max_age_ms then
     vim.notify(no_gaze_message(), vim.log.levels.WARN)
     return
